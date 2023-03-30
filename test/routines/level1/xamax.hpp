@@ -16,6 +16,8 @@
 #ifndef CLBLAST_TEST_ROUTINES_XAMAX_H_
 #define CLBLAST_TEST_ROUTINES_XAMAX_H_
 
+#include <iostream>
+
 #include "test/routines/common.hpp"
 
 namespace clblast {
@@ -76,7 +78,16 @@ class TestXamax {
                             buffers.scalar(), args.imax_offset,
                             buffers.x_vec(), args.x_offset, args.x_inc,
                             &queue_plain, &event);
-      if (status == StatusCode::kSuccess) { clWaitForEvents(1, &event); clReleaseEvent(event); }
+      if (status == StatusCode::kSuccess) {
+        clWaitForEvents(1, &event);
+        clReleaseEvent(event);
+        uint32_t result = 0xFFFFFFFF;
+        clEnqueueReadBuffer(queue(), buffers.scalar(), CL_TRUE, args.imax_offset*sizeof(uint32_t), sizeof(uint32_t),
+                                    &result, 0, nullptr, &event);
+        clWaitForEvents(1, &event);
+        clReleaseEvent(event);
+        std::cout << std::endl << "result_CLBlast = " << result << std::endl;
+      }
     #elif CUDA_API
       auto status = Amax<T>(args.n,
                             buffers.scalar(), args.imax_offset,
@@ -103,10 +114,12 @@ class TestXamax {
 
   // Describes how to run the CPU BLAS routine (for correctness/performance comparison)
   #ifdef CLBLAST_REF_CBLAS
-    static StatusCode RunReference2(const Arguments<T> &args, BuffersHost<T> &buffers_host, Queue &) {
+    static StatusCode RunReference2(const Arguments<T> &args, BuffersHost<T> &buffers_host, Queue &queue) {
+      std::vector<unsigned int> result(1);
       cblasXamax(args.n,
-                 buffers_host.scalar, args.imax_offset,
+                 result, args.imax_offset,
                  buffers_host.x_vec, args.x_offset, args.x_inc);
+      std::cout << std::endl << "result_CBLAS = " << result[0] << std::endl;
       return StatusCode::kSuccess;
     }
   #endif
